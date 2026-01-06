@@ -1,0 +1,48 @@
+{
+    "name": "ember-related-files-hopper",
+    "displayName": "Ember Related Files Hopper",
+    "version": "0.0.1",
+    "publisher": "leon-marbukh",
+    "icon": "icon.png",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [],
+    "main": "./dist/extension.js",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "webpack --mode production",
+        "watch": "webpack --mode development --watch",
+        "package": "vsce package",
+        "test-compile": "tsc -p ./"
+    },
+    "contributes": {
+        "commands": [
+            {
+                "command": "ember-hopper.search",
+                "title": "Ember Hopper: Find Related Files"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "ember-hopper.search",
+                "key": "cmd+shift+.",
+                "mac": "cmd+shift+.",
+                "when": "editorTextFocus"
+            }
+        ],
+        "configuration": {
+            "title": "Ember Hopper",
+            "properties": {
+                "emberHopper.showEmojis": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show/hide emojis in the file dropdown list for a cleaner look."
+                }
+            }
+        }
+    }
+}
