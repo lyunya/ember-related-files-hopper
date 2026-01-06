@@ -8,6 +8,7 @@ A lightning-fast way to navigate between related files in an Ember.js project. W
 -   **Pod Support**: Detects when you are in a `component.js` or `template.hbs` and uses the parent folder name to find related files.
 -   **Fast Directory Search**: Uses optimized directory-based search with parallel processing for lightning-fast results (typically under 1 second).
 -   **File Type Support**: Finds related files including components, templates, routes, controllers, models, serializers, adapters, tests, and styles.
+-   **Glimmer Component Support**: Full support for `.gjs` and `.gts` single-file components.
 -   **Test File Detection**: Automatically identifies test files by filename pattern (`-test`, `.test`) and in test directories (`addon-test-support/`, `packages/tests/`, `tests/`, `test/`).
 -   **Style File Support**: Supports `.less`, `.scss`, and `.css` files with proper labeling.
 -   **Bidirectional Test File Hopping**: Find test files from source files and source files from test files.
@@ -40,6 +41,17 @@ This extension contributes the following settings:
 -   Currently optimized for projects where file names match the entity name (standard Ember convention).
 
 ## Release Notes
+
+### 0.0.7
+
+-   Increased search depth from 4 to 8 for deeply nested Ember monorepo structures
+-   Now finds files in paths like `lib/settings/addon/routes/settings/billing/`
+-   Improved coverage for complex project layouts with multiple nested directories
+
+### 0.0.6
+
+-   Added support for `.gjs` and `.gts` Glimmer component files (single-file components)
+-   Glimmer files are automatically labeled as Components with 🧩 emoji
 
 ### 0.0.5
 

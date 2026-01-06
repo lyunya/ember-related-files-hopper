@@ -9,8 +9,13 @@ const SUPPORTED_EXTENSIONS = new Set([
     '.hbs',
     '.less',
     '.scss',
-    '.css'
+    '.css',
+    '.gjs',
+    '.gts'
 ]);
+
+// Glimmer component extensions (single-file components)
+const GLIMMER_EXTENSIONS = new Set(['.gjs', '.gts']);
 
 // Style file extensions
 const STYLE_EXTENSIONS = new Set(['.less', '.scss', '.css']);
@@ -92,11 +97,11 @@ export function activate(context: vscode.ExtensionContext) {
                             dir: string;
                             depth: number;
                         }> = [
-                            { dir: currentFileDir, depth: 3 }, // Start with current directory
-                            { dir: path.dirname(currentFileDir), depth: 3 }, // Parent directory
+                            { dir: currentFileDir, depth: 4 }, // Start with current directory
+                            { dir: path.dirname(currentFileDir), depth: 4 }, // Parent directory
                             {
                                 dir: path.dirname(path.dirname(currentFileDir)),
-                                depth: 3
+                                depth: 4
                             } // Grandparent
                         ];
 
@@ -124,7 +129,9 @@ export function activate(context: vscode.ExtensionContext) {
                                 try {
                                     const stats = await fs.stat(dirPath);
                                     if (stats.isDirectory()) {
-                                        return { dir: dirPath, depth: 4 };
+                                        // Use depth 8 to handle deeply nested Ember monorepo structures
+                                        // e.g., lib/settings/addon/routes/settings/billing/payment-setup.js
+                                        return { dir: dirPath, depth: 8 };
                                     }
                                 } catch {
                                     // Directory doesn't exist, skip
@@ -261,7 +268,11 @@ function getEmberLabel(filePath: string, useEmojis: boolean): string {
     } else if (segments.includes('routes') || fileName === 'route') {
         type = 'Route';
         emoji = '🛣️ ';
-    } else if (segments.includes('components') || fileName === 'component') {
+    } else if (
+        segments.includes('components') ||
+        fileName === 'component' ||
+        GLIMMER_EXTENSIONS.has(ext)
+    ) {
         type = 'Component';
         emoji = '🧩 ';
     } else if (segments.includes('models') || fileName === 'model') {
