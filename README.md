@@ -6,9 +6,11 @@ A lightning-fast way to navigate between related files in an Ember.js project. W
 
 -   **Smart Detection**: Automatically identifies the base entity (e.g., `user-profile`) regardless of which file you are currently in.
 -   **Pod Support**: Detects when you are in a `component.js` or `template.hbs` and uses the parent folder name to find related files.
--   **Fast Directory Search**: Uses optimized directory-based search for lightning-fast results (typically under 1 second).
--   **File Type Support**: Finds related files including components, templates, routes, controllers, models, serializers, adapters, and tests.
--   **Test File Detection**: Automatically identifies test files in `addon-test-support/` and `packages/tests/` directories.
+-   **Fast Directory Search**: Uses optimized directory-based search with parallel processing for lightning-fast results (typically under 1 second).
+-   **File Type Support**: Finds related files including components, templates, routes, controllers, models, serializers, adapters, tests, and styles.
+-   **Test File Detection**: Automatically identifies test files by filename pattern (`-test`, `.test`) and in test directories (`addon-test-support/`, `packages/tests/`, `tests/`, `test/`).
+-   **Style File Support**: Supports `.less`, `.scss`, and `.css` files with proper labeling.
+-   **Bidirectional Test File Hopping**: Find test files from source files and source files from test files.
 -   **Configurable UI**: Toggle emojis in the search results via settings.
 -   **Smart Filtering**: Automatically excludes the current file and removes duplicates from results.
 
@@ -39,11 +41,47 @@ This extension contributes the following settings:
 
 ## Release Notes
 
-### 1.0.0
+### 0.0.5
 
--   Initial release with Pods and Classic structure support.
--   Fast directory-based search for quick results.
--   Support for components, templates, routes, controllers, models, serializers, adapters, and tests.
--   Automatic test file detection in `addon-test-support/` and `packages/tests/` directories.
--   Emoji indicators for different file types (📝 Template, 🕹️ Controller, 🛣️ Route, 🧩 Component, 💾 Model, 📋 Serializer, 🔌 Adapter, 🧪 Test).
--   Smart filtering to exclude current file and remove duplicates.
+-   **Performance Improvements**:
+    -   Switched to `fs.readdir` with `withFileTypes` option to eliminate separate `stat()` calls (2-3x faster)
+    -   Parallel subdirectory processing for faster traversal
+    -   Batched directory existence checks
+-   **Bug Fixes**:
+    -   Fixed label detection to use proper path segment matching instead of string includes (prevents false positives)
+    -   Fixed pod structure matching logic to correctly find files in pod directories
+    -   Improved test file detection to work bidirectionally (find tests from source files and vice versa)
+-   **New Features**:
+    -   Added support for `.scss` and `.css` style files
+    -   Enhanced test file detection to recognize `-test` and `.test` filename patterns
+    -   Expanded skip directories to include `bower_components` and `vendor`
+-   **Code Quality**:
+    -   Removed dead code
+    -   Improved code organization with constants for file extensions and skip directories
+
+### 0.0.4
+
+-   Fixed issue where test files weren't found when searching from non-test files
+-   Added test directory searching when in source files
+-   Improved file matching to include test file variants (`-test`, `.test`)
+
+### 0.0.3
+
+-   Added support for `.less` style files
+-   Enhanced test file name handling for files ending with `-test`
+-   Improved search to include common Ember directories (`packages/`, `lib/`, `app/`, `src/`, `addon/`)
+
+### 0.0.2
+
+-   Added emoji indicators for serializers (📋) and adapters (🔌)
+-   Improved test file detection for files in `addon-test-support/` and `packages/tests/` directories
+-   Performance optimizations for large codebases
+
+### 0.0.1
+
+-   Initial release with Pods and Classic structure support
+-   Fast directory-based search for quick results
+-   Support for components, templates, routes, controllers, models, serializers, adapters, and tests
+-   Automatic test file detection in `addon-test-support/` and `packages/tests/` directories
+-   Emoji indicators for different file types (📝 Template, 🕹️ Controller, 🛣️ Route, 🧩 Component, 💾 Model, 📋 Serializer, 🔌 Adapter, 🧪 Test)
+-   Smart filtering to exclude current file and remove duplicates

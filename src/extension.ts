@@ -1,10 +1,29 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
-import { promisify } from 'util';
+import * as fs from 'fs/promises';
 
-const readdir = promisify(fs.readdir);
-const stat = promisify(fs.stat);
+// Supported file extensions
+const SUPPORTED_EXTENSIONS = new Set([
+    '.js',
+    '.ts',
+    '.hbs',
+    '.less',
+    '.scss',
+    '.css'
+]);
+
+// Style file extensions
+const STYLE_EXTENSIONS = new Set(['.less', '.scss', '.css']);
+
+// Directories to skip during search
+const SKIP_DIRECTORIES = new Set([
+    'node_modules',
+    'dist',
+    'tmp',
+    '.git',
+    'bower_components',
+    'vendor'
+]);
 
 export function activate(context: vscode.ExtensionContext) {
     let disposable = vscode.commands.registerCommand(
@@ -68,67 +87,88 @@ export function activate(context: vscode.ExtensionContext) {
                         cancellable: false
                     },
                     async () => {
-                        // Search in multiple locations: current dir, parent dirs, and common Ember directories
-                        const searchDirs = [
-                            currentFileDir, // Start with current directory
-                            path.dirname(currentFileDir), // Parent directory
-                            path.dirname(path.dirname(currentFileDir)) // Grandparent
+                        // Search in multiple locations: current dir, parent dirs
+                        const searchDirs: Array<{
+                            dir: string;
+                            depth: number;
+                        }> = [
+                            { dir: currentFileDir, depth: 3 }, // Start with current directory
+                            { dir: path.dirname(currentFileDir), depth: 3 }, // Parent directory
+                            {
+                                dir: path.dirname(path.dirname(currentFileDir)),
+                                depth: 3
+                            } // Grandparent
                         ];
 
-                        // Add common Ember project directories from workspace root
-                        const commonEmberDirs = [
+                        // Check all common directories in parallel for speed
+                        const allDirsToCheck = [
+                            // Common Ember source directories
                             'packages',
                             'lib',
                             'app',
                             'src',
-                            'addon'
+                            'addon',
+                            // Test directories
+                            'tests',
+                            'test',
+                            'spec',
+                            'specs'
                         ];
-                        for (const dirName of commonEmberDirs) {
-                            const dirPath = path.join(workspaceRoot, dirName);
-                            try {
-                                const stats = await stat(dirPath);
-                                if (stats.isDirectory()) {
-                                    searchDirs.push(dirPath);
+
+                        const dirCheckResults = await Promise.all(
+                            allDirsToCheck.map(async (dirName) => {
+                                const dirPath = path.join(
+                                    workspaceRoot,
+                                    dirName
+                                );
+                                try {
+                                    const stats = await fs.stat(dirPath);
+                                    if (stats.isDirectory()) {
+                                        return { dir: dirPath, depth: 4 };
+                                    }
+                                } catch {
+                                    // Directory doesn't exist, skip
                                 }
-                            } catch {
-                                // Directory doesn't exist, skip
+                                return null;
+                            })
+                        );
+
+                        // Add existing directories to search list
+                        for (const result of dirCheckResults) {
+                            if (result) {
+                                searchDirs.push(result);
                             }
                         }
 
-                        // Also search from workspace root with deeper depth
-                        searchDirs.push(workspaceRoot);
-
                         // Remove duplicates from search dirs
-                        const uniqueDirs = Array.from(new Set(searchDirs));
-
-                        for (const searchDir of uniqueDirs) {
-                            if (files.length >= 50) {
-                                break; // Limit total results
+                        const uniqueDirs = new Map<string, number>();
+                        for (const { dir, depth } of searchDirs) {
+                            if (
+                                !uniqueDirs.has(dir) ||
+                                uniqueDirs.get(dir)! < depth
+                            ) {
+                                uniqueDirs.set(dir, depth);
                             }
+                        }
 
+                        // Search directories in parallel for speed
+                        const searchPromises = Array.from(
+                            uniqueDirs.entries()
+                        ).map(async ([searchDir, maxDepth]) => {
                             try {
-                                // Use deeper search for workspace root and common directories
-                                const isWorkspaceRoot =
-                                    searchDir === workspaceRoot;
-                                const isCommonDir = commonEmberDirs.some(
-                                    (dir) =>
-                                        searchDir.includes(
-                                            path.join(workspaceRoot, dir)
-                                        )
-                                );
-                                const maxDepth =
-                                    isWorkspaceRoot || isCommonDir ? 5 : 3;
-
-                                const dirFiles = await findFilesInDirectory(
+                                return await findFilesInDirectory(
                                     searchDir,
                                     baseEntity,
                                     maxDepth
                                 );
-                                files.push(...dirFiles);
                             } catch (error) {
-                                // Skip directories we can't search
+                                return [];
                             }
-                        }
+                        });
+
+                        // Wait for all searches to complete
+                        const searchResults = await Promise.all(searchPromises);
+                        files = searchResults.flat();
 
                         // Remove duplicates by comparing file paths (not URI objects)
                         const uniqueFiles = new Map<string, vscode.Uri>();
@@ -144,11 +184,6 @@ export function activate(context: vscode.ExtensionContext) {
                         files = files.filter(
                             (file) => file.fsPath !== currentFilePath
                         );
-
-                        // Limit to 50 results
-                        if (files.length > 50) {
-                            files = files.slice(0, 50);
-                        }
                     }
                 );
 
@@ -192,46 +227,58 @@ export function activate(context: vscode.ExtensionContext) {
 
 function getEmberLabel(filePath: string, useEmojis: boolean): string {
     const p = filePath.toLowerCase();
+    const ext = path.extname(p);
+    const fileName = path.basename(p, ext);
+    // Split path into segments for accurate matching
+    const segments = p.split(/[/\\]/);
+
     let type = 'File';
     let emoji = '';
 
-    // Check for test directories first
-    if (p.includes('addon-test-support/') || p.includes('packages/tests/')) {
+    // Check for test files first (by filename pattern and path segments)
+    if (
+        fileName.endsWith('-test') ||
+        fileName.endsWith('.test') ||
+        segments.includes('addon-test-support') ||
+        segments.includes('tests') ||
+        segments.includes('test') ||
+        segments.includes('spec') ||
+        segments.includes('specs')
+    ) {
         type = 'Test';
         emoji = '🧪 ';
-    } else if (p.includes('.less')) {
+    } else if (STYLE_EXTENSIONS.has(ext)) {
+        // Check file extension for styles (not path content)
         type = 'Styles';
         emoji = '🎨 ';
-    } else if (p.includes('hbs')) {
+    } else if (ext === '.hbs') {
+        // Check file extension for templates
         type = 'Template';
         emoji = '📝 ';
-    } else if (p.includes('controller')) {
+    } else if (segments.includes('controllers') || fileName === 'controller') {
         type = 'Controller';
         emoji = '🕹️ ';
-    } else if (p.includes('route')) {
+    } else if (segments.includes('routes') || fileName === 'route') {
         type = 'Route';
         emoji = '🛣️ ';
-    } else if (p.includes('component')) {
+    } else if (segments.includes('components') || fileName === 'component') {
         type = 'Component';
         emoji = '🧩 ';
-    } else if (p.includes('model')) {
+    } else if (segments.includes('models') || fileName === 'model') {
         type = 'Model';
         emoji = '💾 ';
-    } else if (p.includes('serializer')) {
+    } else if (segments.includes('serializers') || fileName === 'serializer') {
         type = 'Serializer';
         emoji = '📋 ';
-    } else if (p.includes('adapter')) {
+    } else if (segments.includes('adapters') || fileName === 'adapter') {
         type = 'Adapter';
         emoji = '🔌 ';
-    } else if (p.includes('test') || p.includes('spec')) {
-        type = 'Test';
-        emoji = '🧪 ';
     }
 
     return useEmojis ? `${emoji}${type}` : type;
 }
 
-// Fast directory-based search instead of slow workspace.findFiles
+// Fast directory-based search using readdir with withFileTypes (avoids extra stat calls)
 async function findFilesInDirectory(
     dir: string,
     baseEntity: string,
@@ -247,69 +294,84 @@ async function findFilesInDirectory(
     }
     visited.add(dir);
 
-    // Skip node_modules, dist, tmp, .git
+    // Skip common non-source directories
     const dirName = path.basename(dir);
-    if (
-        dirName === 'node_modules' ||
-        dirName === 'dist' ||
-        dirName === 'tmp' ||
-        dirName === '.git'
-    ) {
+    if (SKIP_DIRECTORIES.has(dirName)) {
         return files;
     }
 
     try {
-        const entries = await readdir(dir);
+        // Use withFileTypes to avoid separate stat() calls - major performance improvement
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        const subdirPromises: Promise<vscode.Uri[]>[] = [];
 
         for (const entry of entries) {
-            if (files.length >= 50) {
-                break; // Limit total results
-            }
+            const fullPath = path.join(dir, entry.name);
 
-            const fullPath = path.join(dir, entry);
-            let stats: fs.Stats;
-
-            try {
-                stats = await stat(fullPath);
-            } catch {
-                continue; // Skip if we can't stat
-            }
-
-            if (stats.isDirectory()) {
-                // Recursively search subdirectories
-                if (currentDepth < maxDepth) {
-                    const subFiles = await findFilesInDirectory(
-                        fullPath,
-                        baseEntity,
-                        maxDepth,
-                        currentDepth + 1,
-                        visited
-                    );
-                    files.push(...subFiles);
-                }
-            } else if (stats.isFile()) {
-                // Check if file matches our patterns
-                const fileName = path.basename(entry, path.extname(entry));
-                const ext = path.extname(entry);
-
-                // Match exact name or pod structure
+            if (entry.isDirectory()) {
+                // Queue subdirectory searches to run in parallel
                 if (
-                    fileName === baseEntity &&
-                    (ext === '.js' ||
-                        ext === '.ts' ||
-                        ext === '.hbs' ||
-                        ext === '.less')
+                    currentDepth < maxDepth &&
+                    !SKIP_DIRECTORIES.has(entry.name)
                 ) {
+                    subdirPromises.push(
+                        findFilesInDirectory(
+                            fullPath,
+                            baseEntity,
+                            maxDepth,
+                            currentDepth + 1,
+                            visited
+                        )
+                    );
+                }
+            } else if (entry.isFile()) {
+                const ext = path.extname(entry.name);
+
+                // Only process supported file types
+                if (!SUPPORTED_EXTENSIONS.has(ext)) {
+                    continue;
+                }
+
+                const fileName = path.basename(entry.name, ext);
+
+                // Match exact name (e.g., payment-collection.js, payment-collection.hbs)
+                if (fileName === baseEntity) {
                     files.push(vscode.Uri.file(fullPath));
-                } else if (
-                    entry === baseEntity &&
-                    (ext === '.js' ||
-                        ext === '.ts' ||
-                        ext === '.hbs' ||
-                        ext === '.less')
+                }
+                // Match test files (e.g., payment-collection-test.js when searching for payment-collection)
+                else if (
+                    (fileName === `${baseEntity}-test` ||
+                        fileName === `${baseEntity}.test`) &&
+                    (ext === '.js' || ext === '.ts')
                 ) {
                     files.push(vscode.Uri.file(fullPath));
                 }
+                // Match pod structure: directory named after entity with generic file inside
+                // e.g., payment-collection/component.js, payment-collection/template.hbs
+                else if (
+                    dirName === baseEntity &&
+                    [
+                        'component',
+                        'template',
+                        'route',
+                        'controller',
+                        'model',
+                        'adapter',
+                        'serializer',
+                        'styles'
+                    ].includes(fileName)
+                ) {
+                    files.push(vscode.Uri.file(fullPath));
+                }
+            }
+        }
+
+        // Process subdirectories in parallel for speed
+        if (subdirPromises.length > 0) {
+            const subResults = await Promise.all(subdirPromises);
+            for (const subFiles of subResults) {
+                files.push(...subFiles);
             }
         }
     } catch (error) {
