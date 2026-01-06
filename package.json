@@ -1,7 +1,7 @@
 {
     "name": "ember-related-files-hopper",
     "displayName": "Ember Related Files Hopper",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "publisher": "leon-marbukh",
     "icon": "icon.png",
     "engines": {
@@ -12,6 +12,10 @@
     ],
     "activationEvents": [],
     "main": "./dist/extension.js",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/lyunya/ember-related-files-hopper.git"
+    },
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "webpack --mode production",

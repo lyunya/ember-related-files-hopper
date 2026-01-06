@@ -42,10 +42,14 @@ export function activate(context: vscode.ExtensionContext) {
                     fileName = path.basename(path.dirname(currentFilePath));
                 }
 
-                // Strip suffixes to get the core name (e.g., 'login-test' -> 'login')
-                const baseEntity = fileName
-                    .replace('-test', '')
-                    .replace('.test', '');
+                // Strip suffixes to get the core name (e.g., 'login-test' -> 'login', 'payment-collection-test' -> 'payment-collection')
+                let baseEntity = fileName;
+                // Remove -test suffix (but only if it's at the end)
+                if (baseEntity.endsWith('-test')) {
+                    baseEntity = baseEntity.slice(0, -5); // Remove '-test' (5 characters)
+                }
+                // Also handle .test suffix
+                baseEntity = baseEntity.replace(/\.test$/, '');
 
                 // 2. Search for matches using fast directory-based search
                 // Start from the directory containing the current file and search nearby
@@ -64,13 +68,35 @@ export function activate(context: vscode.ExtensionContext) {
                         cancellable: false
                     },
                     async () => {
-                        // Search in multiple locations: current dir, parent dirs, and workspace root
+                        // Search in multiple locations: current dir, parent dirs, and common Ember directories
                         const searchDirs = [
                             currentFileDir, // Start with current directory
                             path.dirname(currentFileDir), // Parent directory
-                            path.dirname(path.dirname(currentFileDir)), // Grandparent
-                            workspaceRoot // Workspace root as fallback
+                            path.dirname(path.dirname(currentFileDir)) // Grandparent
                         ];
+
+                        // Add common Ember project directories from workspace root
+                        const commonEmberDirs = [
+                            'packages',
+                            'lib',
+                            'app',
+                            'src',
+                            'addon'
+                        ];
+                        for (const dirName of commonEmberDirs) {
+                            const dirPath = path.join(workspaceRoot, dirName);
+                            try {
+                                const stats = await stat(dirPath);
+                                if (stats.isDirectory()) {
+                                    searchDirs.push(dirPath);
+                                }
+                            } catch {
+                                // Directory doesn't exist, skip
+                            }
+                        }
+
+                        // Also search from workspace root with deeper depth
+                        searchDirs.push(workspaceRoot);
 
                         // Remove duplicates from search dirs
                         const uniqueDirs = Array.from(new Set(searchDirs));
@@ -81,10 +107,22 @@ export function activate(context: vscode.ExtensionContext) {
                             }
 
                             try {
+                                // Use deeper search for workspace root and common directories
+                                const isWorkspaceRoot =
+                                    searchDir === workspaceRoot;
+                                const isCommonDir = commonEmberDirs.some(
+                                    (dir) =>
+                                        searchDir.includes(
+                                            path.join(workspaceRoot, dir)
+                                        )
+                                );
+                                const maxDepth =
+                                    isWorkspaceRoot || isCommonDir ? 5 : 3;
+
                                 const dirFiles = await findFilesInDirectory(
                                     searchDir,
                                     baseEntity,
-                                    3 // Max depth of 3 levels
+                                    maxDepth
                                 );
                                 files.push(...dirFiles);
                             } catch (error) {
@@ -161,6 +199,9 @@ function getEmberLabel(filePath: string, useEmojis: boolean): string {
     if (p.includes('addon-test-support/') || p.includes('packages/tests/')) {
         type = 'Test';
         emoji = '🧪 ';
+    } else if (p.includes('.less')) {
+        type = 'Styles';
+        emoji = '🎨 ';
     } else if (p.includes('hbs')) {
         type = 'Template';
         emoji = '📝 ';
@@ -254,12 +295,18 @@ async function findFilesInDirectory(
                 // Match exact name or pod structure
                 if (
                     fileName === baseEntity &&
-                    (ext === '.js' || ext === '.ts' || ext === '.hbs')
+                    (ext === '.js' ||
+                        ext === '.ts' ||
+                        ext === '.hbs' ||
+                        ext === '.less')
                 ) {
                     files.push(vscode.Uri.file(fullPath));
                 } else if (
                     entry === baseEntity &&
-                    (ext === '.js' || ext === '.ts' || ext === '.hbs')
+                    (ext === '.js' ||
+                        ext === '.ts' ||
+                        ext === '.hbs' ||
+                        ext === '.less')
                 ) {
                     files.push(vscode.Uri.file(fullPath));
                 }
