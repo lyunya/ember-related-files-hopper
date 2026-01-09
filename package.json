@@ -1,7 +1,7 @@
 {
     "name": "ember-related-files-hopper",
     "displayName": "Ember Related Files Hopper",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "publisher": "leon-marbukh",
     "icon": "icon.png",
     "engines": {

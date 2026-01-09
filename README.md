@@ -4,6 +4,10 @@ A lightning-fast way to navigate between related files in an Ember.js project. W
 
 ## Features
 
+-   **Collection-Scoped Search**: Smart search scoping for monorepo structures:
+    -   Files in `lib/<collection>/` only search within their collection (e.g., `lib/documents/`, `lib/billing/`)
+    -   Files in `packages/<collection>/` search within the collection and related test directories (`tests/acceptance/<collection>/`, `tests/integration/<collection>/`)
+    -   Files in other locations (e.g., `app/`, `src/`) use broad search across all directories
 -   **Smart Detection**: Automatically identifies the base entity (e.g., `user-profile`) regardless of which file you are currently in.
 -   **Pod Support**: Detects when you are in a `component.js` or `template.hbs` and uses the parent folder name to find related files.
 -   **Fast Directory Search**: Uses optimized directory-based search with parallel processing for lightning-fast results (typically under 1 second).
@@ -41,6 +45,18 @@ This extension contributes the following settings:
 -   Currently optimized for projects where file names match the entity name (standard Ember convention).
 
 ## Release Notes
+
+### 0.0.8
+
+-   **Collection-Scoped Search**: Added intelligent search scoping for monorepo structures
+    -   Files in `lib/<collection>/` (e.g., `lib/documents/addon/components/foo.js`) now only search within that specific collection
+    -   Files in `packages/<collection>/` (e.g., `packages/charting/src/components/bar.ts`) search within the collection and related test directories:
+        -   `packages/<collection>/`
+        -   `tests/acceptance/<collection>/`
+        -   `tests/integration/<collection>/`
+    -   Files in other locations (e.g., `app/`, `src/`) maintain the original broad search behavior
+-   **Performance**: Improved search performance by limiting scope when working within collections
+-   **Better Results**: Prevents cross-collection matches in large monorepo structures
 
 ### 0.0.7
 
