@@ -157,7 +157,10 @@ function activate(context) {
                             const stats = await fs.stat(searchPath);
                             if (stats.isDirectory()) {
                                 // Use depth 8 for deeply nested structures
-                                searchDirs.push({ dir: searchPath, depth: 8 });
+                                searchDirs.push({
+                                    dir: searchPath,
+                                    depth: 8
+                                });
                             }
                         }
                         catch {
@@ -263,7 +266,19 @@ function activate(context) {
             });
             if (selection) {
                 const doc = await vscode.workspace.openTextDocument(selection.uri);
-                await vscode.window.showTextDocument(doc);
+                // Check if user wants to open in split view (via setting or modifier key)
+                const openInSplitView = config.get('openInSplitView', false);
+                if (openInSplitView) {
+                    // Open in split view (beside current editor) so both files are visible
+                    await vscode.window.showTextDocument(doc, {
+                        viewColumn: vscode.ViewColumn.Beside,
+                        preserveFocus: false
+                    });
+                }
+                else {
+                    // Open normally (replaces current file)
+                    await vscode.window.showTextDocument(doc);
+                }
             }
         }
         catch (error) {
