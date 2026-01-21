@@ -62,43 +62,6 @@ const SKIP_DIRECTORIES = new Set([
     'bower_components',
     'vendor'
 ]);
-/**
- * Detects if the current file is in a collection (lib/ or packages/) and determines
- * which directories should be searched for related files.
- */
-function detectCollectionContext(currentFilePath, workspaceRoot) {
-    // Get relative path from workspace root
-    const relativePath = path.relative(workspaceRoot, currentFilePath);
-    const segments = relativePath.split(path.sep);
-    // Check if file is in lib/ folder
-    if (segments[0] === 'lib' && segments.length > 1) {
-        const collection = segments[1];
-        return {
-            type: 'lib',
-            collection,
-            searchPaths: [path.join(workspaceRoot, 'lib', collection)]
-        };
-    }
-    // Check if file is in packages/ folder
-    if (segments[0] === 'packages' && segments.length > 1) {
-        const collection = segments[1];
-        return {
-            type: 'packages',
-            collection,
-            searchPaths: [
-                path.join(workspaceRoot, 'packages', collection),
-                path.join(workspaceRoot, 'tests', 'acceptance', collection),
-                path.join(workspaceRoot, 'tests', 'integration', collection)
-            ]
-        };
-    }
-    // Not in a collection - return 'other' type with no search paths
-    // (will use default broad search)
-    return {
-        type: 'other',
-        searchPaths: []
-    };
-}
 function activate(context) {
     let disposable = vscode.commands.registerCommand('ember-hopper.search', async () => {
         try {
@@ -140,78 +103,54 @@ function activate(context) {
             const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
                 ? workspaceFolders[0].uri.fsPath
                 : currentFileDir;
-            // Detect if we're in a collection (lib/ or packages/)
-            const collectionContext = detectCollectionContext(currentFilePath, workspaceRoot);
             let files = [];
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: `Searching for files related to "${baseEntity}"...`,
                 cancellable: false
             }, async () => {
-                const searchDirs = [];
-                // If we're in a collection, use scoped search paths
-                if (collectionContext.type !== 'other') {
-                    // Use collection-specific search paths
-                    for (const searchPath of collectionContext.searchPaths) {
-                        try {
-                            const stats = await fs.stat(searchPath);
-                            if (stats.isDirectory()) {
-                                // Use depth 8 for deeply nested structures
-                                searchDirs.push({
-                                    dir: searchPath,
-                                    depth: 8
-                                });
-                            }
-                        }
-                        catch {
-                            // Directory doesn't exist, skip
-                        }
-                    }
-                }
-                else {
-                    // Not in a collection - use broad search (existing behavior)
-                    // Search in multiple locations: current dir, parent dirs
-                    searchDirs.push({ dir: currentFileDir, depth: 4 }, // Start with current directory
-                    { dir: path.dirname(currentFileDir), depth: 4 }, // Parent directory
+                // Search in multiple locations: current dir, parent dirs
+                const searchDirs = [
+                    { dir: currentFileDir, depth: 6 }, // Start with current directory
+                    { dir: path.dirname(currentFileDir), depth: 6 }, // Parent directory
                     {
                         dir: path.dirname(path.dirname(currentFileDir)),
-                        depth: 4
+                        depth: 6
                     } // Grandparent
-                    );
-                    // Check all common directories in parallel for speed
-                    const allDirsToCheck = [
-                        // Common Ember source directories
-                        'packages',
-                        'lib',
-                        'app',
-                        'src',
-                        'addon',
-                        // Test directories
-                        'tests',
-                        'test',
-                        'spec',
-                        'specs'
-                    ];
-                    const dirCheckResults = await Promise.all(allDirsToCheck.map(async (dirName) => {
-                        const dirPath = path.join(workspaceRoot, dirName);
-                        try {
-                            const stats = await fs.stat(dirPath);
-                            if (stats.isDirectory()) {
-                                // Use depth 8 to handle deeply nested Ember monorepo structures
-                                // e.g., lib/settings/addon/routes/settings/billing/payment-setup.js
-                                return { dir: dirPath, depth: 8 };
-                            }
+                ];
+                // Check all common directories in parallel for speed
+                const allDirsToCheck = [
+                    // Common Ember source directories
+                    'packages',
+                    'lib',
+                    'app',
+                    'src',
+                    'addon',
+                    // Test directories
+                    'tests',
+                    'test',
+                    'spec',
+                    'specs'
+                ];
+                const dirCheckResults = await Promise.all(allDirsToCheck.map(async (dirName) => {
+                    const dirPath = path.join(workspaceRoot, dirName);
+                    try {
+                        const stats = await fs.stat(dirPath);
+                        if (stats.isDirectory()) {
+                            // Use depth 8 to handle deeply nested Ember monorepo structures
+                            // e.g., lib/settings/addon/routes/settings/billing/payment-setup.js
+                            return { dir: dirPath, depth: 8 };
                         }
-                        catch {
-                            // Directory doesn't exist, skip
-                        }
-                        return null;
-                    }));
-                    // Add existing directories to search list
-                    for (const result of dirCheckResults) {
-                        if (result) {
-                            searchDirs.push(result);
-                        }
+                    }
+                    catch {
+                        // Directory doesn't exist, skip
+                    }
+                    return null;
+                }));
+                // Add existing directories to search list
+                for (const result of dirCheckResults) {
+                    if (result) {
+                        searchDirs.push(result);
                     }
                 }
                 // Remove duplicates from search dirs
@@ -266,19 +205,7 @@ function activate(context) {
             });
             if (selection) {
                 const doc = await vscode.workspace.openTextDocument(selection.uri);
-                // Check if user wants to open in split view (via setting or modifier key)
-                const openInSplitView = config.get('openInSplitView', false);
-                if (openInSplitView) {
-                    // Open in split view (beside current editor) so both files are visible
-                    await vscode.window.showTextDocument(doc, {
-                        viewColumn: vscode.ViewColumn.Beside,
-                        preserveFocus: false
-                    });
-                }
-                else {
-                    // Open normally (replaces current file)
-                    await vscode.window.showTextDocument(doc);
-                }
+                await vscode.window.showTextDocument(doc);
             }
         }
         catch (error) {

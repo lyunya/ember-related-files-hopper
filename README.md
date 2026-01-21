@@ -32,7 +32,7 @@ This extension contributes the following settings:
 1. Open **Cursor** or **VS Code**.
 2. Press `Cmd + Shift + X` to open Extensions.
 3. Click the `...` in the top right and select **Install from VSIX**.
-4. Select the `ember-related-files-hopper-0.0.8.vsix` file.
+4. Select the `ember-related-files-hopper-0.0.9.vsix` file.
 
 ---
 
@@ -41,6 +41,13 @@ This extension contributes the following settings:
 -   Currently optimized for projects where file names match the entity name (standard Ember convention).
 
 ## Release Notes
+
+### 0.0.9
+
+-   **Bug Fix**: Fixed issue where related files weren't found when working with style files (`.less`, `.scss`, `.css`) or other files in deeply nested directories
+-   **Improved Search Depth**: Increased search depth from 3-4 to 6-8 levels to handle deeply nested monorepo structures
+    -   Now correctly finds files in paths like `lib/settings/addon/routes/settings/billing/payment-setup.js` when searching from `lib/billing/app/styles/less/payment-setup.less`
+    -   Better coverage for complex nested directory structures across all file types
 
 ### 0.0.8
 
