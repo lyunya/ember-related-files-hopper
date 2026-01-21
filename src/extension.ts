@@ -97,11 +97,11 @@ export function activate(context: vscode.ExtensionContext) {
                             dir: string;
                             depth: number;
                         }> = [
-                            { dir: currentFileDir, depth: 6 }, // Start with current directory
-                            { dir: path.dirname(currentFileDir), depth: 6 }, // Parent directory
+                            { dir: currentFileDir, depth: 4 }, // Start with current directory
+                            { dir: path.dirname(currentFileDir), depth: 4 }, // Parent directory
                             {
                                 dir: path.dirname(path.dirname(currentFileDir)),
-                                depth: 6
+                                depth: 4
                             } // Grandparent
                         ];
 
@@ -129,9 +129,9 @@ export function activate(context: vscode.ExtensionContext) {
                                 try {
                                     const stats = await fs.stat(dirPath);
                                     if (stats.isDirectory()) {
-                                        // Use depth 8 to handle deeply nested Ember monorepo structures
-                                        // e.g., lib/settings/addon/routes/settings/billing/payment-setup.js
-                                        return { dir: dirPath, depth: 8 };
+                                        // Use depth 6 to handle deeply nested Ember monorepo structures
+                                        // Balances coverage with performance
+                                        return { dir: dirPath, depth: 6 };
                                     }
                                 } catch {
                                     // Directory doesn't exist, skip

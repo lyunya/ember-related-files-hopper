@@ -32,7 +32,7 @@ This extension contributes the following settings:
 1. Open **Cursor** or **VS Code**.
 2. Press `Cmd + Shift + X` to open Extensions.
 3. Click the `...` in the top right and select **Install from VSIX**.
-4. Select the `ember-related-files-hopper-0.0.9.vsix` file.
+4. Select the `ember-related-files-hopper-0.0.10.vsix` file.
 
 ---
 
@@ -42,12 +42,19 @@ This extension contributes the following settings:
 
 ## Release Notes
 
+### 0.0.10
+
+-   **Performance Optimization**: Balanced search depth for better speed while maintaining coverage
+    -   Local directory search: depth 4 (optimized for nearby files)
+    -   Common directory search: depth 6 (handles deeply nested structures)
+    -   Significantly faster than 0.0.9 while still finding files in complex monorepo structures
+
 ### 0.0.9
 
 -   **Bug Fix**: Fixed issue where related files weren't found when working with style files (`.less`, `.scss`, `.css`) or other files in deeply nested directories
--   **Improved Search Depth**: Increased search depth from 3-4 to 6-8 levels to handle deeply nested monorepo structures
+-   **Improved Search Depth**: Optimized search depth (4 for local, 6 for common directories) to handle deeply nested monorepo structures while maintaining fast performance
     -   Now correctly finds files in paths like `lib/settings/addon/routes/settings/billing/payment-setup.js` when searching from `lib/billing/app/styles/less/payment-setup.less`
-    -   Better coverage for complex nested directory structures across all file types
+    -   Balanced coverage and speed for complex nested directory structures
 
 ### 0.0.8
 
